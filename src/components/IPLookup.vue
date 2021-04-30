@@ -41,13 +41,24 @@
                   <v-text-field v-model="address.address"
                                 label="IP Address"
                                 @blur="lookup(address)"
+                                :disabled="address.loading"
                                 :rules="[validations.required,
                                         validations.ip]"
                   >
                   </v-text-field>
                 </div>
               </v-col>
-              <v-col class="flag">
+              <v-col v-if="address.error"
+                     class="warning"
+              >
+                <v-icon color="primary">mdi-alert</v-icon>
+                Error resolving IP
+              </v-col>
+              <v-col v-else-if="address.loading"
+                     class="flag">
+                <img :src="loadingSpinner"/>
+              </v-col>
+              <v-col v-else class="flag">
                 <img :src="getFlag(address.country)"/>
               </v-col>
             </v-row>
@@ -60,7 +71,7 @@
 
 <script>
 import axios from 'axios'
-import { LOOKUP_URL, getFlag } from '@/utils/utils'
+import { LOOKUP_URL, getFlag, loadingSpinner } from '@/utils/utils'
 import validationMixin from '@/mixins/validations'
 export default {
   mixins: [validationMixin],
@@ -77,21 +88,33 @@ export default {
         id: this.index++,
         address: '',
         country: '',
-        isValid: false
+        isValid: false,
+        loading: false,
+        error: false
       })
     },
     lookup (item) {
-      // disable the input field until server response
       if (item.isValid) {
+        item.loading = true
         axios.get(`${LOOKUP_URL}${item.address}`).then(resp => {
           item.country = resp.data.countryCode.toLowerCase()
+          if (resp.data.countryCode === '') {
+            item.error = true
+          } else {
+            item.error = false
+          }
           console.log(resp)
+          item.loading = false
         })
-        console.log(item)
       }
     },
     getFlag (flag) {
       return getFlag(flag)
+    }
+  },
+  computed: {
+    loadingSpinner () {
+      return loadingSpinner()
     }
   },
   created () {
@@ -116,6 +139,12 @@ export default {
     align-items: center;
     .flag {
       max-width: 60px;
+      img {
+        width: 100%;
+      }
+    }
+    .warning {
+      text-align: center;
     }
   }
 </style>
