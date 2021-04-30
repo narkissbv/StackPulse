@@ -44,6 +44,8 @@
                                 :disabled="address.loading"
                                 :rules="[validations.required,
                                         validations.ip]"
+                                :ref="`input${address.id}`"
+                                autofocus
                   >
                   </v-text-field>
                 </div>
@@ -55,11 +57,12 @@
                 Error resolving IP
               </v-col>
               <v-col v-else-if="address.loading"
-                     class="flag">
+                     class="loading">
                 <img :src="loadingSpinner"/>
               </v-col>
-              <v-col v-else class="flag">
+              <v-col v-if="address.country.length === 2" class="flag">
                 <img :src="getFlag(address.country)"/>
+                <span>{{ address.time }}</span>
               </v-col>
             </v-row>
           </v-form>
@@ -71,30 +74,34 @@
 
 <script>
 import axios from 'axios'
+import * as moment from 'moment-timezone'
 import { LOOKUP_URL, getFlag, loadingSpinner } from '@/utils/utils'
 import validationMixin from '@/mixins/validations'
 export default {
   mixins: [validationMixin],
   data () {
     return {
-      index: 1,
+      index: 0,
       addresses: [],
+      interval: null,
       ipLookupFormValid: false
     }
   },
   methods: {
     addAddress () {
       this.addresses.push({
-        id: this.index++,
+        id: ++this.index,
         address: '',
         country: '',
         isValid: false,
         loading: false,
-        error: false
+        error: false,
+        time: ''
       })
     },
     lookup (item) {
       if (item.isValid) {
+        item.error = false
         item.loading = true
         axios.get(`${LOOKUP_URL}${item.address}`).then(resp => {
           item.country = resp.data.countryCode.toLowerCase()
@@ -110,6 +117,16 @@ export default {
     },
     getFlag (flag) {
       return getFlag(flag)
+    },
+    timeLoop () {
+      this.addresses.forEach(address => {
+        if (address.country) {
+          const zones = moment.tz.zonesForCountry(address.country, true)
+          if (zones.length > 0) {
+            address.time = moment.tz(zones[0].name).format('H:mm:ss')
+          }
+        }
+      })
     }
   },
   computed: {
@@ -119,6 +136,10 @@ export default {
   },
   created () {
     this.addAddress()
+    this.interval = setInterval(this.timeLoop, 1000)
+  },
+  beforeDestroy () {
+    clearInterval(this.interval)
   }
 }
 </script>
@@ -137,10 +158,19 @@ export default {
   .address-container {
     display: flex;
     align-items: center;
-    .flag {
+    .loading {
       max-width: 60px;
       img {
         width: 100%;
+      }
+    }
+    .flag {
+      max-width: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      img {
+        width: 50px;
       }
     }
     .warning {
